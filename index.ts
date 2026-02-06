@@ -88,15 +88,10 @@ function handleEvent(event: BridgeEvent): void {
       break;
 
     case "message":
-      if (api && event.from && event.text) {
-        // Route message to OpenClaw
-        api.runtime.inbound?.({
-          channel: "threema",
-          from: event.from,
-          text: event.text,
-          timestamp: event.time ? new Date(event.time) : new Date(),
-          meta: { nick: event.nick },
-        });
+      if (event.from && event.text) {
+        // Log incoming message - routing handled by channel gateway adapter
+        console.log(`[threema] Message from ${event.from}: ${event.text}`);
+        // TODO: Route to OpenClaw session via gateway adapter
       }
       break;
 
