@@ -1,128 +1,144 @@
-# OpenClaw Threema Channel Plugin
+# OpenClaw Threema Plugin
 
-A channel plugin for OpenClaw that enables messaging via Threema Gateway.
+A channel plugin for OpenClaw that enables messaging via Threema using a **personal account** (not Gateway API).
 
-## Overview
+## Features
 
-This plugin enables OpenClaw to send and receive messages through Threema, the privacy-focused messenger, using the official Threema Gateway API.
+- 🔒 End-to-end encrypted messaging via Threema
+- 💰 **No per-message costs** - just a one-time CHF 6 Threema license
+- 🔄 Automatic reconnection with exponential backoff
+- 📱 Uses go-threema library for personal account mode
 
-## Threema Gateway API
+## Architecture
 
-### Authentication
-- API Identity: 8 characters, usually starts with `*`
-- API Secret: Authentication secret from Threema Gateway dashboard
-
-### Two Modes
-
-**Basic Mode (Server-side encryption)**
-- Server handles encryption
-- Simpler but server knows private key
-- No incoming messages support
-- URL: `https://msgapi.threema.ch/send_simple`
-
-**E2E Mode (End-to-end encryption)** ← PREFERRED
-- Client handles NaCl encryption
-- Full privacy
-- Supports incoming messages via callback URL
-- URL: `https://msgapi.threema.ch/send_e2e`
-
-### Key Endpoints
-
-**Send Message (Basic)**
 ```
-POST https://msgapi.threema.ch/send_simple
-Params: from, to|phone|email, text, secret
+┌─────────────────┐     JSON/stdio     ┌──────────────────┐
+│  OpenClaw       │◄──────────────────►│  threema-bridge  │
+│  (TypeScript)   │                    │  (Go binary)     │
+└─────────────────┘                    └────────┬─────────┘
+                                                │
+                                                ▼
+                                       ┌──────────────────┐
+                                       │  Threema Servers │
+                                       └──────────────────┘
 ```
 
-**Send Message (E2E)**
+The TypeScript plugin spawns a Go binary (`threema-bridge`) that handles the Threema protocol. Communication happens via JSON over stdin/stdout.
+
+## Setup
+
+### 1. Get a Threema License
+
+Buy a Threema Android license at https://shop.threema.ch (~CHF 6 one-time).
+
+### 2. Create & Export Identity
+
+1. Install Threema on a phone or Android emulator
+2. Create your ID using the license key
+3. Export your identity: **Settings → My ID → Export**
+4. Save the 80-character backup key and password
+
+### 3. Install Plugin
+
+```bash
+# Clone the repo
+git clone https://github.com/sloppy-claw/openclaw-threema.git
+cd openclaw-threema
+
+# Build the Go bridge binary
+go build -o threema-bridge ./cmd/threema-bridge/
+
+# Or download pre-built from releases
 ```
-POST https://msgapi.threema.ch/send_e2e
-Params: from, to, nonce (24 bytes hex), box (encrypted, hex), secret
-```
 
-**Lookup**
-```
-GET https://msgapi.threema.ch/lookup/phone/<E164>
-GET https://msgapi.threema.ch/lookup/email/<email>
-GET https://msgapi.threema.ch/lookup/id/<threemaId>
-```
+### 4. Configure OpenClaw
 
-**Get Public Key**
-```
-GET https://msgapi.threema.ch/pubkeys/<id>
-```
+Add to your OpenClaw config:
 
-**Receive Messages (E2E only)**
-Callback URL receives POST with:
-- `from`: Sender Threema ID
-- `to`: Your Gateway ID
-- `messageId`: Message ID
-- `date`: Unix timestamp
-- `nonce`: Encryption nonce (hex)
-- `box`: Encrypted message (hex)
-- `mac`: HMAC for verification
-
-### HTTP Status Codes
-- 200: Success
-- 400: Invalid recipient or wrong mode
-- 401: Invalid credentials
-- 402: No credits
-- 404: Recipient not found (phone/email lookup)
-- 413: Message too long
-- 429: Rate limited
-
-### Message Limits
-- Text: max 3500 bytes UTF-8
-- Encrypted box: max 7812 bytes
-
-## OpenClaw Plugin Structure
-
-Follow the pattern from existing plugins (telegram, bluebubbles):
-
-### Config Schema
 ```json5
 {
   channels: {
     threema: {
       enabled: true,
-      apiId: "*YOURID",          // Gateway ID
-      apiSecret: "your-secret",  // Gateway secret
-      privateKey: "...",         // NaCl private key (hex) for E2E
-      mode: "e2e",               // "basic" or "e2e"
-      webhookPath: "/threema-webhook",
-      dmPolicy: "pairing",       // pairing | allowlist | open | disabled
-      allowFrom: [],             // Threema IDs
+      backup: "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX",
+      password: "your-backup-password",
+      contacts: {
+        "ABCD1234": "base64-public-key-here"
+      },
+      dmPolicy: "pairing"
     }
   }
 }
 ```
 
-### Features to Implement
-1. **Send messages** - Text via E2E encrypted API
-2. **Receive messages** - Webhook handler for callbacks
-3. **Lookup** - Resolve phone/email to Threema ID
-4. **Pairing** - Standard OpenClaw pairing flow
-5. **Encryption** - NaCl box encryption/decryption
+### 5. Get Contact Public Keys
 
-### Dependencies
-- `tweetnacl` or `libsodium` for NaCl encryption
-- Standard Node.js fetch/https
-
-## Reference
-
-- Threema Gateway API: https://gateway.threema.ch/en/developer/api
-- Threema Gateway E2E: https://gateway.threema.ch/en/developer/api/e2e
-- Python SDK reference: https://pypi.org/project/threema.gateway/
-- OpenClaw BlueBubbles plugin: `/usr/lib/node_modules/openclaw/dist/channels/plugins/bluebubbles*.js`
-- OpenClaw Telegram plugin: `/usr/lib/node_modules/openclaw/dist/channels/plugins/telegram.js`
-
-## Development
+To message someone, you need their public key. Get it from Threema's directory:
 
 ```bash
-# Test send (basic mode)
-curl -X POST https://msgapi.threema.ch/send_simple \
-  -d "from=*YOURID&to=TARGETID&text=Hello&secret=YOURSECRET"
-
-# Lookup by phone
-curl "https://msgapi.threema.ch/lookup/phone/41791234567?from=*YOURID&secret=YOURSECRET"
+curl https://api.threema.ch/identity/ABCD1234 | jq .publicKey
 ```
+
+Or scan their QR code in the Threema app.
+
+## Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `backup` | string | 80-char exported identity backup |
+| `password` | string | Backup decryption password |
+| `contacts` | object | Map of Threema ID → base64 public key |
+| `dmPolicy` | string | `open`, `pairing`, or `allowlist` |
+| `allowFrom` | array | Allowed Threema IDs (for allowlist mode) |
+
+## Bridge Protocol
+
+The Go bridge communicates via JSON over stdin/stdout:
+
+**Commands (TypeScript → Go):**
+```json
+{"cmd":"connect","backup":"...","password":"..."}
+{"cmd":"send","to":"ABCD1234","text":"Hello!","pubkey":"..."}
+{"cmd":"trust","to":"ABCD1234","pubkey":"..."}
+{"cmd":"ping"}
+```
+
+**Events (Go → TypeScript):**
+```json
+{"event":"connected","id":"MYID1234"}
+{"event":"message","from":"ABCD1234","nick":"Alice","time":"...","text":"Hi!"}
+{"event":"error","error":"..."}
+{"event":"pong"}
+```
+
+## Building
+
+```bash
+# Build Go binary
+go build -ldflags="-s -w" -o threema-bridge ./cmd/threema-bridge/
+
+# Run tests
+go test -v ./...
+
+# Type-check TypeScript
+npx tsc --noEmit
+```
+
+## Comparison: Personal vs Gateway
+
+| Aspect | Personal (this plugin) | Gateway |
+|--------|------------------------|---------|
+| Cost | CHF 6 one-time | CHF 50+ setup + CHF 0.04/msg |
+| Stability | Unofficial, may break | Official, supported |
+| ToS | "Tolerated" | Allowed |
+| Groups | Limited | Full support |
+| Receive | Requires running daemon | Webhook callback |
+
+## License
+
+MIT
+
+## Credits
+
+- [go-threema](https://github.com/karalabe/go-threema) by karalabe
+- [Threema](https://threema.ch) - the privacy-focused messenger

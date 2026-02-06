@@ -1,22 +1,22 @@
 {
   "name": "openclaw-threema",
-  "version": "0.1.0",
-  "description": "Threema Gateway channel plugin for OpenClaw",
+  "version": "0.2.0",
+  "description": "Threema channel plugin for OpenClaw using personal account mode (go-threema)",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "index.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "node --test test/",
-    "lint": "eslint src/"
+    "build:go": "go build -ldflags='-s -w' -o threema-bridge ./cmd/threema-bridge/",
+    "build": "npm run build:go",
+    "test:go": "go test -v ./...",
+    "test": "npm run test:go",
+    "typecheck": "npx tsc --noEmit"
   },
-  "keywords": ["openclaw", "threema", "channel", "plugin", "gateway"],
+  "keywords": ["openclaw", "threema", "channel", "plugin", "personal", "go-threema"],
   "author": "Slopbot",
   "license": "MIT",
-  "dependencies": {
-    "tweetnacl": "^1.0.3",
-    "tweetnacl-util": "^0.15.1"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sloppy-claw/openclaw-threema.git"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

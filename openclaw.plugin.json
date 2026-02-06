@@ -1,8 +1,8 @@
 {
   "id": "threema",
-  "name": "Threema Gateway",
-  "version": "0.1.0",
-  "description": "Privacy-focused messaging via Threema Gateway with E2E encryption",
+  "name": "Threema Personal",
+  "version": "0.2.0",
+  "description": "Privacy-focused messaging via personal Threema account using go-threema",
   "channels": ["threema"],
   "configSchema": {
     "type": "object",
@@ -11,29 +11,18 @@
       "enabled": {
         "type": "boolean"
       },
-      "apiId": {
+      "backup": {
         "type": "string",
-        "description": "Threema Gateway API identity (8 chars, starts with *)",
-        "pattern": "^\\*[A-Z0-9]{7}$"
+        "description": "80-char exported identity backup (XXXX-XXXX-...)"
       },
-      "apiSecret": {
+      "password": {
         "type": "string",
-        "description": "Threema Gateway API secret"
+        "description": "Backup decryption password"
       },
-      "privateKey": {
-        "type": "string",
-        "description": "64-char hex private key for E2E mode"
-      },
-      "mode": {
-        "type": "string",
-        "enum": ["e2e", "basic"],
-        "default": "e2e",
-        "description": "Encryption mode (e2e recommended)"
-      },
-      "webhookPath": {
-        "type": "string",
-        "default": "/threema-webhook",
-        "description": "Webhook path for incoming messages"
+      "contacts": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "description": "Map of Threema ID to base64 public key"
       },
       "dmPolicy": {
         "type": "string",
@@ -45,25 +34,22 @@
         "items": { "type": "string" },
         "description": "Allowed Threema IDs (for allowlist policy)"
       }
-    },
-    "required": []
+    }
   },
   "uiHints": {
-    "apiId": {
-      "label": "Gateway ID",
-      "placeholder": "*MYID123"
+    "backup": {
+      "label": "Identity Backup",
+      "placeholder": "XXXX-XXXX-XXXX-...",
+      "sensitive": true,
+      "help": "Export from Threema app: Settings → My ID → Export"
     },
-    "apiSecret": {
-      "label": "API Secret",
+    "password": {
+      "label": "Backup Password",
       "sensitive": true
     },
-    "privateKey": {
-      "label": "Private Key (E2E mode)",
-      "sensitive": true,
-      "help": "64-char hex key for end-to-end encryption"
-    },
-    "mode": {
-      "label": "Encryption Mode"
+    "contacts": {
+      "label": "Trusted Contacts",
+      "help": "Threema ID → Public Key (base64)"
     },
     "dmPolicy": {
       "label": "DM Policy"
